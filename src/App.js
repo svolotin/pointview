@@ -1,8 +1,18 @@
 import React, { Component } from 'react';
-import logo from './logo.svg';
 import './App.css';
 import axios from 'axios'
 import { Map, Marker, Popup, TileLayer } from 'react-leaflet'
+import CanvasMarkersLayer from './CanvasMarkersLayer';
+import markerIcon from './img/tree.png';
+import L from 'leaflet';
+
+const defaultIcon = L.icon({
+  iconUrl: markerIcon,
+  iconSize: [24, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  tooltipAnchor: [16, -28],
+})
 
 class App extends Component {
   constructor(props) {
@@ -17,6 +27,11 @@ class App extends Component {
     }
   }
 
+
+  onMarkerClick(e, marker) {
+    this.props.onMarkerClick && this.props.onMarkerClick(e, marker);
+  }
+
   addPointToQuery = (e) => {
     const { queryarray } = this.state
     var lat = e.latlng.lat;
@@ -24,7 +39,6 @@ class App extends Component {
     console.log([lat, long]);
     queryarray.push([long, lat])
     this.setState({ queryarray })
-
   }
 
   doQuery = (event) => {
@@ -33,13 +47,11 @@ class App extends Component {
       coordinates: [this.state.queryarray],
       Type: "Polygon"
     }
-
     axios
       .post('http://localhost:18080/geospatial/rest/trunks/inarea ', queryObject)
       .then(response => {
         this.setState({
           results: this.state.results.concat(response.data)
-
         })
       })
   }
@@ -51,21 +63,35 @@ class App extends Component {
     this.setState({ queryarray, results })
   }
 
+  renderMarkers() {
+    const { results } = this.state
+    return results.map((object) => {
+      const { x, y, area, height, species } = object
+      var position = {
+        lat: y,
+        lng: x
+      }
+      return (<Marker position={position} icon={defaultIcon}>
+        <Popup>
+          <span>Trunk Area: {area} <br />Height: {height} <br />Species: {species}</span>
+        </Popup>
+      </Marker>);
+    });
+  }
+
   render() {
     const position = [this.state.lat, this.state.lng]
     const area = this.state.queryarray
-    const pc = true
     return (
       <div>
-        <Map center={position} onClick={this.addPointToQuery} zoom={this.state.zoom} preferCanvas={pc}>
+        <Map center={position} onClick={this.addPointToQuery} zoom={this.state.zoom} >
           <TileLayer
             attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {this.state.results.map((object) =>
-            <Resultmarker object={object} >
-            </Resultmarker>
-          )}
+          <CanvasMarkersLayer onMarkerClick={(e, marker) => this.onMarkerClick(e, marker)}>
+            {this.renderMarkers()}
+          </CanvasMarkersLayer>
         </Map><br />
         <Button
           handleClick={this.doQuery}
@@ -82,23 +108,6 @@ class App extends Component {
 
     )
   }
-}
-
-const Resultmarker = ({ object }) => {
-  const { x, y, area, height, species } = object
-
-  var position = {
-    lat: y,
-    lng: x
-  }
-
-  return (
-    <Marker position={position}>
-      <Popup>
-        <span>Trunk Area: {area} <br />Height: {height} <br />Species: {species}</span>
-      </Popup>
-    </Marker>
-  )
 }
 
 const Button = ({ handleClick, text }) => (
